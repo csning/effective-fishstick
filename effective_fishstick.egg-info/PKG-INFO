@@ -1,0 +1,28 @@
+Metadata-Version: 2.4
+Name: effective-fishstick
+Version: 0.1.0
+Summary: AI-driven stock trading assistant
+Requires-Python: >=3.12
+Requires-Dist: akshare>=1.14.0
+Requires-Dist: pandas>=2.2.0
+Requires-Dist: numpy>=2.0.0
+Requires-Dist: openai>=1.50.0
+Requires-Dist: httpx>=0.28.0
+Requires-Dist: redis>=5.2.0
+Requires-Dist: pydantic>=2.10.0
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: apscheduler>=3.10.0
+Requires-Dist: loguru>=0.7.0
+Requires-Dist: pyarrow>=18.0.0
+Requires-Dist: fastparquet>=2024.5.0
+Requires-Dist: matplotlib>=3.9.0
+Requires-Dist: rich>=13.0.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.24.0; extra == "dev"
+Requires-Dist: ruff>=0.6.0; extra == "dev"
+Requires-Dist: chromadb>=0.5.0; extra == "dev"
+Provides-Extra: feishu
+Requires-Dist: lark-oapi>=1.4.0; extra == "feishu"
+Provides-Extra: backtest
+Requires-Dist: backtrader>=1.9.78; extra == "backtest"

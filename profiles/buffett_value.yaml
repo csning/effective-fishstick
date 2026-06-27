@@ -1,0 +1,16 @@
+name: "Buffett-Style Value"
+description: "High safety margin, long-term hold, ignores short-term noise"
+
+bias:
+  stock_selection:
+    pe_max: 20
+    roe_min: 0.15
+    prefer_sectors: ["Consumer", "Finance", "Energy"]
+    holding_period: "long"
+  timing:
+    signal_sensitivity: "low"
+    stop_loss_pct_override: 0.15
+  position:
+    concentration: "high"
+    max_positions: 10
+    rebalance_frequency: "monthly"

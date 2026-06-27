@@ -1,0 +1,50 @@
+[project]
+name = "effective-fishstick"
+version = "0.1.0"
+description = "AI-driven stock trading assistant"
+requires-python = ">=3.12"
+dependencies = [
+    "akshare>=1.14.0",
+    "pandas>=2.2.0",
+    "tushare>=1.4.0",
+    "numpy>=2.0.0",
+    "openai>=1.50.0",
+    "httpx>=0.28.0",
+    "redis>=5.2.0",
+    "pydantic>=2.10.0",
+    "pyyaml>=6.0",
+    "apscheduler>=3.10.0",
+    "loguru>=0.7.0",
+    "pyarrow>=18.0.0",
+    "fastparquet>=2024.5.0",
+    "matplotlib>=3.9.0",
+    "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.6.0",
+    "chromadb>=0.5.0",
+]
+feishu = [
+    "lark-oapi>=1.4.0",
+]
+backtest = [
+    "backtrader>=1.9.78",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+exclude = ["data_cache*", "__pycache__*", ".*"]

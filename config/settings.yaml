@@ -1,0 +1,21 @@
+data:
+  history_days: 1095
+  request_interval: 0.5
+  us_indices:
+  - .DJI
+  - .IXIC
+  - .SPX
+llm:
+  chat_model: deepseek-v4-flash
+  provider: deepseek
+  reasoner_model: deepseek-v4-pro
+notify:
+  channel: feishu
+risk:
+  auto_adjust: true
+  default_level: 3
+trade_import:
+  mode: fragment
+  watch_dir: trade_imports
+vps:
+  mac_mini_addr: ''

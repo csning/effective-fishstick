@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+data_cache/
+settings.local.yaml
+*.parquet
+.DS_Store
+.vscode/
+.idea/

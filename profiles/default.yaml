@@ -1,0 +1,16 @@
+name: "Default Balanced"
+description: "Multi-factor selection + technical timing, neutral risk"
+
+bias:
+  stock_selection:
+    pe_max: 60
+    roe_min: 0.08
+    prefer_sectors: []
+    holding_period: "medium"
+  timing:
+    signal_sensitivity: "medium"
+    require_volume_confirmation: true
+  position:
+    concentration: "medium"
+    max_positions: 15
+    rebalance_frequency: "weekly"
