@@ -44,10 +44,3 @@ class Server:
             self._server.should_exit = True
 
 
-def run_server(host: str = "0.0.0.0", port: int = 8000):
-    """同步入口，供 main.py 调用。"""
-    server = Server(host=host, port=port)
-    try:
-        asyncio.run(server.start())
-    except KeyboardInterrupt:
-        logger.info("服务已停止")

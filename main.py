@@ -34,9 +34,9 @@ async def main():
         logger.info("每日复盘 — 待实现")
 
     elif cmd == "serve":
-        from web.server import run_server
+        from web.server import Server
         port = int(sys.argv[2]) if len(sys.argv) > 2 else 8000
-        run_server(port=port)
+        await Server(port=port).start()
 
     else:
         print(__doc__)
