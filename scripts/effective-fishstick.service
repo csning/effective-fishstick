@@ -1,0 +1,16 @@
+[Unit]
+Description=Effective Fishstick - Feishu Bot
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/effective-fishstick
+ExecStart=/opt/effective-fishstick/.venv/bin/python main.py serve 8000
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

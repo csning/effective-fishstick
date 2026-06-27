@@ -21,12 +21,23 @@ async def main():
     logger.info(f"风险等级: {settings.risk.default_level}")
 
     cmd = sys.argv[1] if len(sys.argv) > 1 else "help"
+
     if cmd == "select":
-        logger.info("选股 — 待实现")
+        from agents.base import AgentContext
+        from agents.stock_selector import StockSelector
+        selector = StockSelector(top_n=20, use_llm=True)
+        ctx = AgentContext(risk_level=settings.risk.default_level)
+        result = await selector.run(ctx)
+        print(result.summary)
+
     elif cmd == "review":
         logger.info("每日复盘 — 待实现")
+
     elif cmd == "serve":
-        logger.info("飞书 Bot 服务 — 待实现")
+        from web.server import run_server
+        port = int(sys.argv[2]) if len(sys.argv) > 2 else 8000
+        run_server(port=port)
+
     else:
         print(__doc__)
 
