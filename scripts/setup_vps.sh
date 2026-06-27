@@ -38,15 +38,19 @@ install_python() {
             apt-get install -y -qq python3.12 python3.12-venv python3.12-dev git curl
             ;;
         centos|rhel|rocky|almalinux)
-            dnf install -y epel-release 2>/dev/null || yum install -y epel-release
-            dnf install -y python3.12 python3.12-devel git curl 2>/dev/null || {
-                warn "CentOS 7 需要手动安装 Python 3.12，请参考 https://github.com/deadsnakes"
-                exit 1
-            }
-            ;;
-        *)
-            warn "不支持的系统: $OS"
-            exit 1
+            log "CentOS 系列，源码编译 Python 3.12（约 3-5 分钟）..."
+            dnf install -y -q gcc make openssl-devel bzip2-devel libffi-devel zlib-devel wget sqlite-devel
+            cd /tmp
+            wget -q https://www.python.org/ftp/python/3.12.4/Python-3.12.4.tgz
+            tar xzf Python-3.12.4.tgz
+            cd Python-3.12.4
+            ./configure --enable-optimizations --prefix=/usr/local 2>&1 | tail -3
+            make -j$(nproc) 2>&1 | tail -3
+            make altinstall
+            ln -sf /usr/local/bin/python3.12 /usr/bin/python3.12
+            ln -sf /usr/local/bin/pip3.12 /usr/bin/pip3.12
+            cd /tmp && rm -rf Python-3.12.4*
+            log "Python 3.12 编译安装完成"
             ;;
     esac
 }
