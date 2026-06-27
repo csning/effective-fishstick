@@ -9,3 +9,4 @@ settings.local.yaml
 .DS_Store
 .vscode/
 .idea/
+effective_fishstick.egg-info/
