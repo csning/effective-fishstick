@@ -9,7 +9,10 @@
 import asyncio
 import hashlib
 import json
+import time
+import traceback
 from typing import Optional
+from datetime import datetime, timezone, timedelta
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
@@ -35,6 +38,22 @@ app = FastAPI(title="Effective Fishstick - Feishu Bot", version="0.1.0")
 _feishu: Optional[FeishuClient] = None
 _command_tasks: dict[str, asyncio.Task] = {}
 
+# 最近事件记录（用于诊断）
+_recent_events: list[dict] = []
+_max_recent_events = 20
+TZ = timezone(timedelta(hours=8))
+_startup_time = datetime.now(TZ)
+
+
+def _record_event(event_type: str, detail: dict):
+    _recent_events.append({
+        "time": datetime.now(TZ).isoformat(),
+        "type": event_type,
+        "detail": detail,
+    })
+    if len(_recent_events) > _max_recent_events:
+        _recent_events.pop(0)
+
 
 def get_feishu() -> FeishuClient:
     global _feishu
@@ -48,10 +67,34 @@ def get_feishu() -> FeishuClient:
     return _feishu
 
 
-# ── 签名验证 ────────────────────────────────────────────────
+# ── 辅助函数 ────────────────────────────────────────────────
+
+def _extract_open_id(event: dict) -> str:
+    """从飞书事件中提取发送者的 open_id。
+
+    飞书 v2 事件格式中 sender.sender_id 是一个对象：
+    {"open_id": "...", "union_id": "...", "user_id": "..."}
+    """
+    sender = event.get("sender", {})
+    sender_id = sender.get("sender_id", "")
+
+    # 飞书 v2：sender_id 是对象
+    if isinstance(sender_id, dict):
+        open_id = sender_id.get("open_id", "")
+        if open_id:
+            return open_id
+        return sender_id.get("union_id", sender_id.get("user_id", ""))
+
+    # 飞书 v1 / 旧格式：sender_id 是字符串
+    if isinstance(sender_id, str) and sender_id:
+        return sender_id
+
+    # 兜底
+    return sender.get("open_id", "")
+
 
 def _verify_signature(timestamp: str, nonce: str, body: bytes) -> bool:
-    """飞书事件签名验证（可选，建议开启）。"""
+    """飞书事件签名验证（当前跳过，后续按飞书文档完善）。"""
     settings = get_settings()
     secret = settings.notify.feishu_app_secret
 
@@ -59,9 +102,6 @@ def _verify_signature(timestamp: str, nonce: str, body: bytes) -> bool:
         logger.debug("[飞书] 未配置 app_secret，跳过签名验证")
         return True
 
-    # 飞书签名算法：sha256(timestamp + nonce + encrypt_key + body)
-    # 注意：不同版本的 API 签名算法可能略有差异
-    content = f"{timestamp}{nonce}{secret}".encode() + body
     return True  # 当前跳过实际验证，后续根据飞书文档完善
 
 
@@ -74,19 +114,31 @@ async def feishu_webhook(request: Request):
     飞书会先发送 challenge 验证 URL，然后推送事件。
     """
     body = await request.body()
-    data = json.loads(body)
+    headers = dict(request.headers)
+    client_ip = request.client.host if request.client else "unknown"
+
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError as e:
+        logger.error(f"[飞书] JSON 解析失败: {e} | body={body[:500]}")
+        _record_event("json_error", {"error": str(e)})
+        return JSONResponse({"code": -1, "msg": "invalid json"}, status_code=400)
 
     # URL 验证 — 返回 challenge
     if data.get("type") == "url_verification":
         challenge = data.get("challenge", "")
-        logger.info(f"[飞书] URL 验证: challenge={challenge[:20]}...")
+        logger.info(f"[飞书] URL 验证 成功 | challenge={challenge[:20]}... | ip={client_ip}")
+        _record_event("url_verification", {"challenge": challenge[:20], "ip": client_ip})
         return JSONResponse({"challenge": challenge})
 
     # 事件处理
     if data.get("type") == "event_callback":
         event = data.get("event", {})
         event_type = event.get("type", "")
-        logger.info(f"[飞书] 收到事件: type={event_type}")
+        schema_version = data.get("schema", "?")
+        logger.info(f"[飞书] 收到事件 type={event_type} schema={schema_version} ip={client_ip}")
+        logger.debug(f"[飞书] 事件详情: {json.dumps(event, ensure_ascii=False)[:800]}")
+        _record_event(event_type, {"schema": schema_version})
 
         if event_type == "im.message.receive_v1":
             asyncio.create_task(_handle_message(event))
@@ -101,9 +153,7 @@ async def _handle_message(event: dict):
     message = event.get("message", {})
     message_id = message.get("message_id", "")
     content_str = message.get("content", "{}")
-    sender = event.get("sender", {})
-    sender_id = sender.get("sender_id", "")
-    open_id = sender.get("open_id", sender_id)
+    open_id = _extract_open_id(event)
 
     # 解析消息内容
     try:
@@ -113,17 +163,24 @@ async def _handle_message(event: dict):
 
     text = content.get("text", "").strip()
     if not text:
-        await get_feishu().reply_text(message_id, "未识别到有效指令。发送「帮助」查看可用指令。")
+        try:
+            await get_feishu().reply_text(message_id, "未识别到有效指令。发送「帮助」查看可用指令。")
+        except Exception as e:
+            logger.error(f"[飞书] 回复空指令失败: {e}")
         return
 
-    logger.info(f"[飞书] 收到消息: sender={open_id} text={text[:100]}")
+    logger.info(f"[飞书] 收到消息 open_id={open_id[:12]}... msg_id={message_id[:12]}... text={text[:100]}")
 
     # 指令解析
     cmd = parse_command(text)
 
     # 异步处理指令，先发送 loading 提示
     feishu = get_feishu()
-    await feishu.reply_text(message_id, f"收到指令「{cmd.action}」，处理中...")
+    try:
+        await feishu.reply_text(message_id, f"收到指令「{cmd.action}」，处理中...")
+    except Exception as e:
+        logger.error(f"[飞书] 发送 loading 回复失败: {e}")
+        logger.error(traceback.format_exc())
 
     # 分发到对应处理器
     handler_map = {
@@ -137,18 +194,27 @@ async def _handle_message(event: dict):
     }
 
     handler = handler_map.get(cmd.action, _handle_unknown)
-    await handler(cmd, open_id, message_id)
+    try:
+        await handler(cmd, open_id, message_id)
+    except Exception as e:
+        logger.error(f"[飞书] 指令处理异常 cmd={cmd.action}: {e}")
+        logger.error(traceback.format_exc())
+        try:
+            feishu = get_feishu()
+            await feishu.reply_text(message_id, f"处理指令时出错: {e}")
+        except Exception:
+            pass
 
 
 async def _handle_select(cmd: ParsedCommand, open_id: str, message_id: str):
     """选股指令处理。"""
-    await get_feishu().reply_text(message_id, "选股功能正在开发中，当前支持通过命令行运行 python test_run.py 查看选股结果。")
+    await get_feishu().reply_text(message_id, "选股功能正在开发中。\n当前可通过命令行运行选股：\n```\npython test_run.py\n```")
 
 
 async def _handle_analyze(cmd: ParsedCommand, open_id: str, message_id: str):
     """单票分析指令处理。"""
     code = cmd.args.get("code", "")
-    await get_feishu().reply_text(message_id, f"单票分析 {code} 正在开发中，敬请期待。")
+    await get_feishu().reply_text(message_id, f"单票分析 {code} 正在开发中。\n当前可通过命令行运行：\n```\npython test_run.py\n```")
 
 
 async def _handle_position(cmd: ParsedCommand, open_id: str, message_id: str):
@@ -199,8 +265,27 @@ async def _handle_card_action(event: dict):
     # 卡片回调暂时不处理，后续通过按钮触发二次操作
 
 
-# ── 健康检查 ──────────────────────────────────────────────────
+# ── 诊断端点 ──────────────────────────────────────────────────
 
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "effective-fishstick"}
+
+
+@app.get("/feishu/health")
+async def feishu_health():
+    """飞书 Bot 诊断端点。检查配置状态和最近事件。"""
+    settings = get_settings()
+    uptime = datetime.now(TZ) - _startup_time
+    return {
+        "status": "ok",
+        "service": "effective-fishstick",
+        "uptime_seconds": int(uptime.total_seconds()),
+        "feishu": {
+            "app_id_configured": bool(settings.notify.feishu_app_id),
+            "app_secret_configured": bool(settings.notify.feishu_app_secret),
+            "webhook_configured": bool(settings.notify.feishu_webhook),
+            "channel": settings.notify.channel,
+        },
+        "recent_events": _recent_events[-10:],
+    }
