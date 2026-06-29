@@ -131,11 +131,26 @@ async def feishu_webhook(request: Request):
         _record_event("url_verification", {"challenge": challenge[:20], "ip": client_ip})
         return JSONResponse({"challenge": challenge})
 
-    # 事件处理
-    if data.get("type") == "event_callback":
+    # 事件处理 — 兼容 v1 (type: event_callback) 和 v2 (schema: 2.0)
+    event_type = ""
+    event = {}
+    schema_version = data.get("schema", "?")
+
+    if schema_version == "2.0":
+        # 飞书 v2：event_type 在 header.event_type
+        header = data.get("header", {})
+        event_type = header.get("event_type", "")
+        event = data.get("event", {})
+    elif data.get("type") == "event_callback":
+        # 飞书 v1：event_type 在 event.type
         event = data.get("event", {})
         event_type = event.get("type", "")
-        schema_version = data.get("schema", "?")
+    else:
+        # 未知格式 — 记录并忽略
+        logger.warning(f"[飞书] 未知事件格式, keys={list(data.keys())[:8]} ip={client_ip}")
+        _record_event("unknown_format", {"keys": list(data.keys())[:8]})
+
+    if event_type:
         logger.info(f"[飞书] 收到事件 type={event_type} schema={schema_version} ip={client_ip}")
         logger.debug(f"[飞书] 事件详情: {json.dumps(event, ensure_ascii=False)[:800]}")
         _record_event(event_type, {"schema": schema_version})
