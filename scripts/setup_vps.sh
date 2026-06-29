@@ -159,3 +159,17 @@ echo "  事件订阅 URL:  http://<VPS公网IP>:8000/feishu/webhook"
 echo ""
 echo "⚠️  别忘了在阿里云安全组中放行 TCP 8000 端口！"
 echo "============================================"
+
+# ── 8. 运行诊断 ──────────────────────────────────────────
+
+echo ""
+log "运行飞书连通性诊断..."
+cd "$PROJECT_DIR"
+if [ -f ".venv/bin/python" ]; then
+    .venv/bin/python scripts/check_feishu.py 2>&1 || true
+else
+    warn "虚拟环境不可用，跳过诊断。请手动运行: python scripts/check_feishu.py"
+fi
+
+echo ""
+log "如需重新诊断: cd $PROJECT_DIR && .venv/bin/python scripts/check_feishu.py"
