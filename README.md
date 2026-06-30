@@ -346,3 +346,4 @@ back-calculate bias from actual trade CSV to auto-generate profiles.
 | 4 | TimingAgent + PositionAdvisor + DailyReviewer | |
 | 5 | RiskEngine auto-adaptation + strategy profiles | |
 | 6 | Real-time anomaly monitoring + backtest framework | |
+| Phase 5 | 风控自适应 + 策略画像 + 交易导入 | ✅ |

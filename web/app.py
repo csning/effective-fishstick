@@ -311,10 +311,48 @@ async def _handle_review(cmd: ParsedCommand, open_id: str, message_id: str):
 async def _handle_risk(cmd: ParsedCommand, open_id: str, message_id: str):
     """风控指令处理。"""
     level = cmd.args.get("level")
-    if level is not None:
-        await get_feishu().reply_text(message_id, f"风险等级已锁定为 {level}/5（功能开发中）。")
-    else:
-        await get_feishu().reply_text(message_id, "当前风险等级 3/5 · 正常模式（功能开发中）。")
+    try:
+        from engine.risk import RiskEngine
+        from config import get_settings
+
+        s = get_settings()
+        engine = RiskEngine(
+            position_caps=s.risk.position_caps,
+            stop_loss_pcts=s.risk.stop_loss_pcts,
+        )
+
+        if level is not None:
+            engine.lock_level(int(level))
+            await get_feishu().reply_text(
+                message_id,
+                f"风险等级已锁定: {level}/5\n"
+                f"仓位上限: {engine.position_caps.get(int(level), 0.7):.0%}\n"
+                f"止损宽度: {engine.stop_loss_pcts.get(int(level), 0.08):.1%}\n"
+                f"发送「风险」查看当前状态，发送「风险 0」恢复自动评估。"
+            )
+        elif level == 0:
+            engine.unlock()
+            assessment = engine.assess()
+            await get_feishu().reply_text(
+                message_id,
+                f"已恢复自动风控评估。\n"
+                f"当前评分: {assessment.score:.3f} → 等级 {assessment.level}/5\n"
+                f"仓位上限: {assessment.position_cap:.0%}\n"
+                f"止损宽度: {assessment.stop_loss_pct:.1%}"
+            )
+        else:
+            assessment = engine.assess()
+            await get_feishu().reply_text(
+                message_id,
+                f"当前风控评估:\n"
+                f"综合评分: {assessment.score:.3f} → 等级 {assessment.level}/5\n"
+                f"仓位上限: {assessment.position_cap:.0%}\n"
+                f"止损宽度: {assessment.stop_loss_pct:.1%}\n"
+                f"{assessment.reasoning}"
+            )
+    except Exception as e:
+        logger.error(f"[飞书] 风控异常: {e}")
+        await get_feishu().reply_text(message_id, f"风控评估异常: {e}")
 
 
 async def _handle_help(cmd: ParsedCommand, open_id: str, message_id: str):

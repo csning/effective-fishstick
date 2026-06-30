@@ -55,6 +55,55 @@ async def main():
     elif cmd == "position":
         print("持仓诊断 — 从飞书发送「持仓」指令使用，或通过代码传入持仓数据。")
 
+    elif cmd == "risk":
+        from engine.risk import RiskEngine
+        from config import get_settings
+        s = get_settings()
+        engine = RiskEngine(
+            position_caps=s.risk.position_caps,
+            stop_loss_pcts=s.risk.stop_loss_pcts,
+        )
+        assessment = engine.assess()
+        print(f"风险等级: {assessment.level}/5")
+        print(f"综合评分: {assessment.score:.3f}")
+        print(f"仓位上限: {assessment.position_cap:.0%}")
+        print(f"止损宽度: {assessment.stop_loss_pct:.1%}")
+        print(f"分析: {assessment.reasoning}")
+
+    elif cmd == "profile":
+        from engine.profile import ProfileEngine
+        engine = ProfileEngine()
+        engine.load_all()
+        name = sys.argv[2] if len(sys.argv) > 2 else None
+        if name:
+            bias = engine.apply(name)
+            print(f"切换策略画像: {name}")
+            print(f"  名称: {bias.name}")
+            print(f"  描述: {bias.description}")
+            print(f"  PE 上限: {bias.pe_max}")
+            print(f"  持仓周期: {bias.holding_period}")
+            print(f"  信号灵敏度: {bias.signal_sensitivity}")
+            print(f"  最大持仓数: {bias.max_positions}")
+        else:
+            profiles = engine.list_profiles()
+            print("可用策略画像:")
+            for k, v in profiles.items():
+                mark = " *" if k == engine.active_name else ""
+                print(f"  {k}: {v}{mark}")
+
+    elif cmd == "import":
+        path = sys.argv[2] if len(sys.argv) > 2 else None
+        if not path:
+            print("用法: python main.py import <csv_file>")
+            print("CSV 格式: code,name,direction,price,shares,date")
+            return
+        from engine.trade_import import import_and_generate
+        profile = import_and_generate(path)
+        print(f"画像反推完成: {profile.name}")
+        print(f"  描述: {profile.description}")
+        print(f"  持股周期: {profile.holding_period}")
+        print(f"  PE 上限: {profile.pe_max}")
+
     elif cmd == "serve":
         from web.server import Server
         port = int(sys.argv[2]) if len(sys.argv) > 2 else 8000
