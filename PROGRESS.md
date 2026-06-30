@@ -11,7 +11,7 @@
 | Phase 3 | 飞书 Bot 接入（Webhook + 指令解析） | ✅ |
 | Phase 4 | 择时 Agent + 持仓建议 + 每日复盘 | ✅ |
 | Phase 5 | 风控自适应 + 策略画像 + 交易导入 | ✅ |
-| Phase 6 | 实时异动监控 + 回测框架 | 下一步 |
+| Phase 6 | 实时异动监控 + 回测框架 | ✅ |
 
 ## 已实现 Agent
 
@@ -65,10 +65,10 @@ python main.py serve           # 启动飞书 Bot 服务
 
 | 模块 | 状态 |
 |---|---|
-| `agents/anomaly.py` | 8 行 stub，Phase 6 |
+| — | 全部完成 |
 | `storage/models.py` | 2 行 stub |
 | `storage/vector_store.py` | 2 行 stub |
 
-## 下一步
+## 完成
 
 Phase 6: AnomalyMonitor 实时异动监控（规则引擎+LLM分级）+ 回测框架集成

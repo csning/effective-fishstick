@@ -57,7 +57,7 @@ async def main():
 
     elif cmd == "risk":
         from engine.risk import RiskEngine
-        from config import get_settings
+        # already imported at top
         s = get_settings()
         engine = RiskEngine(
             position_caps=s.risk.position_caps,
