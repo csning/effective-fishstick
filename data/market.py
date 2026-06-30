@@ -53,15 +53,15 @@ def get_daily_kline(symbol: str, days: int = 250, adjust: str = "qfq") -> pd.Dat
     end = datetime.now().strftime("%Y%m%d")
 
     try:
-        _http_enable()
+        # _http_enable()  -- disabled for debug
         df = ak.stock_zh_a_hist(
             symbol=symbol, period="daily",
             start_date=start, end_date=end, adjust=adjust,
         )
-        _http_disable()
+        # _http_disable()
         _sleep()
     except Exception as e:
-        _http_disable()
+        # _http_disable()
         logger.warning(f"日线拉取失败 {symbol}: {e}")
         return pd.DataFrame()
 
@@ -95,15 +95,15 @@ def get_index_daily(code: str, days: int = 60) -> pd.DataFrame:
         return cached
 
     try:
-        _http_enable()
+        # _http_enable()  -- disabled for debug
         if code in _US_INDICES:
             df = ak.index_us_stock_sina(symbol=code)
         else:
             df = ak.stock_zh_index_daily_em(symbol=code)
-        _http_disable()
+        # _http_disable()
         _sleep()
     except Exception as e:
-        _http_disable()
+        # _http_disable()
         logger.warning(f"指数拉取失败 {code}: {e}")
         return pd.DataFrame()
 
@@ -146,12 +146,12 @@ def get_sector_flow() -> pd.DataFrame:
         return cached
 
     try:
-        _http_enable()
+        # _http_enable()  -- disabled for debug
         df = ak.stock_sector_fund_flow_rank(indicator="今日", sector_type="行业资金流")
-        _http_disable()
+        # _http_disable()
         _sleep()
     except Exception as e:
-        _http_disable()
+        # _http_disable()
         logger.warning(f"板块资金流拉取失败: {e}")
         return pd.DataFrame()
 

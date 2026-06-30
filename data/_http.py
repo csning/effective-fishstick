@@ -11,14 +11,9 @@ _EM_HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
     ),
     "Referer": "https://quote.eastmoney.com/",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-    "Accept-Encoding": "gzip, deflate, br",
+    "Accept": "text/html,application/json,*/*",
+    "Accept-Language": "zh-CN,zh;q=0.9",
     "Connection": "keep-alive",
-    "Cache-Control": "max-age=0",
-    "Sec-Ch-Ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-    "Sec-Ch-Ua-Mobile": "?0",
-    "Sec-Ch-Ua-Platform": '"macOS"',
 }
 
 _orig_get = requests.get
@@ -34,21 +29,21 @@ def enable():
         return
 
     def _get(url, **kwargs):
-        h = dict(kwargs.pop("headers", None) or {})
+        h = dict(kwargs.get("headers") or {})
         for k, v in _EM_HEADERS.items():
             h.setdefault(k, v)
         kwargs["headers"] = h
         return _orig_get(url, **kwargs)
 
     def _post(url, **kwargs):
-        h = dict(kwargs.pop("headers", None) or {})
+        h = dict(kwargs.get("headers") or {})
         for k, v in _EM_HEADERS.items():
             h.setdefault(k, v)
         kwargs["headers"] = h
         return _orig_post(url, **kwargs)
 
     def _session_request(self, method, url, **kwargs):
-        h = dict(kwargs.pop("headers", None) or {})
+        h = dict(kwargs.get("headers") or {})
         for k, v in _EM_HEADERS.items():
             h.setdefault(k, v)
         kwargs["headers"] = h
