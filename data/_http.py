@@ -1,9 +1,11 @@
-"""HTTP 请求头猴子补丁 — 绕过东方财富反爬。
+"""HTTP 请求层 — 使用 curl-cffi 模拟 Chrome TLS 指纹，绕过东方财富反爬。
 
-同时 patch requests.get / requests.post / requests.Session.request。
+curl-cffi 通过 impersonate 参数伪造 Chrome 131 的 JA3/JA4 指纹。
+直接接管 requests.get/post/Session.request，不经过 standard requests。
 """
 
-import requests
+import requests as _std_requests
+from curl_cffi import requests as _curl_requests
 
 _EM_HEADERS = {
     "User-Agent": (
@@ -16,51 +18,56 @@ _EM_HEADERS = {
     "Connection": "keep-alive",
 }
 
-_orig_get = requests.get
-_orig_post = requests.post
-_orig_session_request = requests.Session.request
+_orig_get = _std_requests.get
+_orig_post = _std_requests.post
+_orig_session_request = _std_requests.Session.request
 _patched = False
+
+_curl_session = None
+
+
+def _get_session():
+    global _curl_session
+    if _curl_session is None:
+        _curl_session = _curl_requests.Session(impersonate="chrome131")
+    return _curl_session
 
 
 def enable():
-    """全局注入东方财富反爬请求头。"""
+    """用 curl-cffi (Chrome TLS 指纹) 接管全局 requests。"""
     global _patched
     if _patched:
         return
 
     def _get(url, **kwargs):
-        h = dict(kwargs.get("headers") or {})
+        params = kwargs.pop("params", None)
+        headers = dict(kwargs.pop("headers", None) or {})
+        timeout = kwargs.pop("timeout", 30)
+        verify = kwargs.pop("verify", None)
         for k, v in _EM_HEADERS.items():
-            h.setdefault(k, v)
-        kwargs["headers"] = h
-        return _orig_get(url, **kwargs)
+            headers.setdefault(k, v)
+        return _get_session().get(
+            url, params=params, headers=headers, timeout=timeout
+        )
 
     def _post(url, **kwargs):
-        h = dict(kwargs.get("headers") or {})
+        headers = dict(kwargs.pop("headers", None) or {})
+        timeout = kwargs.pop("timeout", 30)
         for k, v in _EM_HEADERS.items():
-            h.setdefault(k, v)
-        kwargs["headers"] = h
-        return _orig_post(url, **kwargs)
+            headers.setdefault(k, v)
+        return _get_session().post(
+            url, headers=headers, timeout=timeout, **kwargs
+        )
 
-    def _session_request(self, method, url, **kwargs):
-        h = dict(kwargs.get("headers") or {})
-        for k, v in _EM_HEADERS.items():
-            h.setdefault(k, v)
-        kwargs["headers"] = h
-        return _orig_session_request(self, method, url, **kwargs)
-
-    requests.get = _get
-    requests.post = _post
-    requests.Session.request = _session_request
+    _std_requests.get = _get
+    _std_requests.post = _post
     _patched = True
 
 
 def disable():
-    """恢复原始 requests 方法。"""
     global _patched
     if not _patched:
         return
-    requests.get = _orig_get
-    requests.post = _orig_post
-    requests.Session.request = _orig_session_request
+    _std_requests.get = _orig_get
+    _std_requests.post = _orig_post
     _patched = False
