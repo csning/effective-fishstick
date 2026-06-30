@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 import akshare as ak
-import requests
+import curl_cffi.requests as requests
 import pandas as pd
 from loguru import logger
 
@@ -74,7 +74,7 @@ def get_daily_kline(symbol: str, days: int = 250, adjust: str = "qfq") -> pd.Dat
             "beg": start,
             "end": end,
         }
-        resp = requests.get(url, params=params, headers=_EM_HEADERS, timeout=30, verify=False)
+        resp = requests.get(url, params=params, headers=_EM_HEADERS, timeout=30, verify=False, impersonate="chrome131")
         resp.raise_for_status()
         data = resp.json()
         klines = data.get("data", {}).get("klines", [])
@@ -132,7 +132,7 @@ def get_index_daily(code: str, days: int = 60) -> pd.DataFrame:
                 "beg": "19900101",
                 "end": "20500101",
             }
-            resp = requests.get(url, params=params, headers=_EM_HEADERS, timeout=30, verify=False)
+            resp = requests.get(url, params=params, headers=_EM_HEADERS, timeout=30, verify=False, impersonate="chrome131")
             resp.raise_for_status()
             data = resp.json()
             klines = data.get("data", {}).get("klines", [])
