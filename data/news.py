@@ -6,6 +6,7 @@ from typing import Optional
 
 import akshare as ak
 import pandas as pd
+import requests
 from loguru import logger
 
 from config import get_settings
@@ -66,17 +67,48 @@ def get_announcements(symbol: str, days: int = 30) -> pd.DataFrame:
         return pd.DataFrame()
 
     return df or pd.DataFrame()
+    if df is None or df.empty:
+        return pd.DataFrame()
+    return df
 
 
 def get_market_news(days: int = 3) -> pd.DataFrame:
-    """Pull broad market news (not stock-specific) for daily review context."""
+    """Pull market news headlines via EastMoney fast-news API.
+
+    Uses np-weblist.eastmoney.com which returns 200 items in a single call,
+    unlike the paginated stock_info_global_em which fetches 58 pages.
+    """
     cache_key = DataCache.make_key("market_news", days=days)
     cached = _cache.get(cache_key, ttl_seconds=1800)
     if cached is not None:
         return cached
 
     try:
-        df = ak.stock_info_global_em()
+        url = "https://np-weblist.eastmoney.com/comm/web/getFastNewsList"
+        params = {
+            "client": "web",
+            "biz": "web_724",
+            "fastColumn": "102",
+            "sortEnd": "",
+            "pageSize": "200",
+        }
+        resp = requests.get(url, params=params, timeout=15,
+                           headers={"User-Agent": "Mozilla/5.0",
+                                   "Referer": "https://kuaixun.eastmoney.com/"})
+        data = resp.json()
+        items = data.get("data", {}).get("fastNewsList", [])
+        if not items:
+            return pd.DataFrame()
+
+        rows = []
+        for item in items:
+            rows.append({
+                "标题": item.get("title", ""),
+                "摘要": item.get("summary", ""),
+                "发布时间": item.get("showTime", ""),
+                "链接": f"https://finance.eastmoney.com/a/{item.get('code', '')}.html",
+            })
+        df = pd.DataFrame(rows)
         _sleep()
     except Exception as e:
         logger.warning(f"Market news pull failed: {e}")
@@ -89,3 +121,9 @@ def get_market_news(days: int = 3) -> pd.DataFrame:
             df = df[df["发布时间"] >= cutoff]
         _cache.put(cache_key, df)
     return df or pd.DataFrame()
+    if df is None or df.empty:
+        return pd.DataFrame()
+    return df
+    if df is None or df.empty:
+        return pd.DataFrame()
+    return df

@@ -160,7 +160,7 @@ class PositionAdvisor(BaseAgent):
     async def _fetch_prices(self, codes: list[str]) -> dict[str, float]:
         price_map: dict[str, float] = {}
         try:
-            df = get_active_top_n(n=500, sort_by="amount")
+            df = get_active_top_n(n=200, sort_by="amount")
             if df.empty:
                 return price_map
 
