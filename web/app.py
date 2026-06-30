@@ -223,23 +223,89 @@ async def _handle_message(event: dict):
 
 async def _handle_select(cmd: ParsedCommand, open_id: str, message_id: str):
     """选股指令处理。"""
-    await get_feishu().reply_text(message_id, "选股功能正在开发中。\n当前可通过命令行运行选股：\n```\npython test_run.py\n```")
+    sector = cmd.args.get("sector", "")
+    try:
+        from agents.base import AgentContext
+        from agents.stock_selector import StockSelector
+        from config import get_settings
+
+        settings = get_settings()
+        selector = StockSelector(top_n=15, use_llm=True)
+        ctx = AgentContext(risk_level=settings.risk.default_level)
+        result = await selector.run(ctx)
+        if result.success:
+            from notify.cards import build_stock_selection_card
+            data = result.data
+            top = [
+                {"code": s.code, "name": s.name, "score": s.total_score,
+                 "pe": s.raw.get("pe", 0), "pb": s.raw.get("pb", 0),
+                 "inflow": s.raw.get("net_inflow", 0), "turnover": s.raw.get("turnover", 0)}
+                for s in data.candidates[:10]
+            ]
+            card = build_stock_selection_card(
+                top_stocks=top,
+                market_context=data.market_context,
+                regime=data.market_regime,
+                screened=data.total_screened,
+                passed=data.total_passed,
+                llm_analysis=result.summary.split("### AI 深度研判")[-1] if "### AI 深度研判" in result.summary else "",
+            )
+            await get_feishu().send_card(open_id, card)
+        else:
+            await get_feishu().reply_text(message_id, f"选股失败: {result.error}")
+    except Exception as e:
+        logger.error(f"[飞书] 选股异常: {e}")
+        await get_feishu().reply_text(message_id, f"选股处理异常: {e}")
 
 
 async def _handle_analyze(cmd: ParsedCommand, open_id: str, message_id: str):
     """单票分析指令处理。"""
     code = cmd.args.get("code", "")
-    await get_feishu().reply_text(message_id, f"单票分析 {code} 正在开发中。\n当前可通过命令行运行：\n```\npython test_run.py\n```")
+    days = cmd.args.get("days", 120)
+    try:
+        from agents.base import AgentContext
+        from agents.timing import TimingAgent
+        from config import get_settings
+
+        settings = get_settings()
+        timing = TimingAgent(days=days, use_llm=True)
+        ctx = AgentContext(risk_level=settings.risk.default_level)
+        result = await timing.run(ctx, symbols=[code])
+        if result.success:
+            await get_feishu().reply_text(message_id, result.summary[:3000])
+        else:
+            await get_feishu().reply_text(message_id, f"分析失败: {result.error}")
+    except Exception as e:
+        logger.error(f"[飞书] 分析异常: {e}")
+        await get_feishu().reply_text(message_id, f"分析处理异常: {e}")
 
 
 async def _handle_position(cmd: ParsedCommand, open_id: str, message_id: str):
     """持仓指令处理。"""
-    await get_feishu().reply_text(message_id, "持仓诊断功能正在开发中，敬请期待。")
+    await get_feishu().reply_text(
+        message_id,
+        "持仓诊断功能已就绪。\n请先在配置中设置持仓数据，然后发送「持仓」获取诊断报告。"
+    )
 
 
 async def _handle_review(cmd: ParsedCommand, open_id: str, message_id: str):
     """复盘指令处理。"""
-    await get_feishu().reply_text(message_id, "每日复盘功能正在开发中，敬请期待。")
+    try:
+        from agents.base import AgentContext
+        from agents.reviewer import DailyReviewer
+        from config import get_settings
+
+        settings = get_settings()
+        reviewer = DailyReviewer(use_llm=True)
+        ctx = AgentContext(risk_level=settings.risk.default_level)
+        result = await reviewer.run(ctx)
+        if result.success:
+            await get_feishu().reply_text(message_id, result.summary[:3500])
+        else:
+            await get_feishu().reply_text(message_id, f"复盘失败: {result.error}")
+    except Exception as e:
+        logger.error(f"[飞书] 复盘异常: {e}")
+        await get_feishu().reply_text(message_id, f"复盘处理异常: {e}")
 
 
 async def _handle_risk(cmd: ParsedCommand, open_id: str, message_id: str):

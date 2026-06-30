@@ -189,3 +189,4 @@ def get_market_breadth() -> dict:
         "up_ratio": round(float((pct > 0).mean()), 3),
         "avg_pct": round(float(pct.mean()), 2),
     }
+    return df if df is not None and not df.empty else pd.DataFrame()
