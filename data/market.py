@@ -119,8 +119,38 @@ def get_daily_kline(symbol: str, days: int = 250, adjust: str = "qfq") -> pd.Dat
         logger.info(f"日线数据: {symbol} ({len(df)} 行) [BaoStock]")
         return df
 
-    except Exception as e:
-        logger.warning(f"BaoStock 日线拉取失败 {symbol}: {e}")
+    except Exception as bs_e:
+        logger.warning(f"BaoStock 日线拉取失败 {symbol}: {bs_e}")
+
+    # Tushare 回退
+    try:
+        from .tushare import _get_pro
+        pro = _get_pro()
+        if pro is None:
+            return pd.DataFrame()
+        ts_code = f"{symbol}.{'SH' if symbol.startswith('6') else 'SZ'}"
+        start_ts = (datetime.now() - timedelta(days=days)).strftime("%Y%m%d")
+        end_ts = datetime.now().strftime("%Y%m%d")
+        df = pro.daily(ts_code=ts_code, start_date=start_ts, end_date=end_ts)
+        if df is None or df.empty:
+            return pd.DataFrame()
+        df.columns = [c.lower() for c in df.columns]
+        df.rename(columns={
+            "trade_date": "date", "pre_close": "preclose",
+            "pct_chg": "pct_chg", "vol": "volume",
+        }, inplace=True)
+        for c in ["open", "high", "low", "close", "preclose", "volume", "amount"]:
+            if c in df.columns:
+                df[c] = pd.to_numeric(df[c], errors="coerce")
+        if "date" in df.columns:
+            df["date"] = pd.to_datetime(df["date"])
+        df.sort_values("date", inplace=True)
+        df.reset_index(drop=True, inplace=True)
+        _cache.put(cache_key, df)
+        logger.info(f"日线数据: {symbol} ({len(df)} 行) [Tushare]")
+        return df
+    except Exception as ts_e:
+        logger.warning(f"Tushare 日线拉取失败 {symbol}: {ts_e}")
         return pd.DataFrame()
 
 
@@ -175,7 +205,7 @@ def get_index_daily(code: str, days: int = 60) -> pd.DataFrame:
         _cache.put(cache_key, df)
         return df
 
-    except Exception as e:
+    except Exception as bs_e:
         logger.warning(f"BaoStock 指数拉取失败 {code}: {e}")
         return pd.DataFrame()
 
@@ -260,7 +290,7 @@ def get_sector_flow() -> pd.DataFrame:
         _cache.put(cache_key, df)
         logger.info(f"板块资金流: {len(df)} 个板块")
         return df
-    except Exception as e:
+    except Exception as bs_e:
         logger.warning(f"板块资金流拉取失败: {e}")
         return pd.DataFrame()
 
