@@ -5,12 +5,13 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 import akshare as ak
+import requests
 import pandas as pd
 from loguru import logger
 
 from config import get_settings
 from .cache import DataCache
-from ._http import enable as _http_enable, disable as _http_disable
+# _http imports removed — using direct HTTP
 
 _settings = get_settings()
 _cache = DataCache(_settings.data.cache_dir)
@@ -53,15 +54,30 @@ def get_daily_kline(symbol: str, days: int = 250, adjust: str = "qfq") -> pd.Dat
     end = datetime.now().strftime("%Y%m%d")
 
     try:
-        _http_enable()
-        df = ak.stock_zh_a_hist(
-            symbol=symbol, period="daily",
-            start_date=start, end_date=end, adjust=adjust,
-        )
-        _http_disable()
+        secid = f"1.{symbol}" if symbol.startswith("6") else f"0.{symbol}"
+        url = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
+        params = {
+            "secid": secid,
+            "fields1": "f1,f2,f3,f4,f5,f6",
+            "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f116",
+            "klt": "101",
+            "fqt": "1" if adjust == "qfq" else "2" if adjust == "hfq" else "0",
+            "beg": start,
+            "end": end,
+        }
+        resp = requests.get(url, params=params, headers=_EM_HEADERS, timeout=30, verify=False)
+        resp.raise_for_status()
+        data = resp.json()
+        klines = data.get("data", {}).get("klines", [])
+        if not klines:
+            return pd.DataFrame()
+        rows = []
+        for k in klines:
+            parts = k.split(",")
+            rows.append({"date": parts[0], "open": parts[1], "close": parts[2], "high": parts[3], "low": parts[4], "volume": parts[5], "amount": parts[6], "turnover": parts[10] if len(parts) > 10 else "0"})
+        df = pd.DataFrame(rows)
         _sleep()
     except Exception as e:
-        _http_disable()
         logger.warning(f"日线拉取失败 {symbol}: {e}")
         return pd.DataFrame()
 
@@ -95,15 +111,31 @@ def get_index_daily(code: str, days: int = 60) -> pd.DataFrame:
         return cached
 
     try:
-        _http_enable()
         if code in _US_INDICES:
-            df = ak.index_us_stock_sina(symbol=code)
-        else:
-            df = ak.stock_zh_index_daily_em(symbol=code)
-        _http_disable()
+            secid = f"1.{code[2:]}" if code.startswith("sh") else f"0.{code[2:]}"
+            url = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
+            params = {
+                "secid": secid,
+                "fields1": "f1,f2,f3,f4,f5",
+                "fields2": "f51,f52,f53,f54,f55,f56,f57,f58",
+                "klt": "101",
+                "fqt": "0",
+                "beg": "19900101",
+                "end": "20500101",
+            }
+            resp = requests.get(url, params=params, headers=_EM_HEADERS, timeout=30, verify=False)
+            resp.raise_for_status()
+            data = resp.json()
+            klines = data.get("data", {}).get("klines", [])
+            if not klines:
+                return pd.DataFrame()
+            rows = []
+            for k in klines:
+                parts = k.split(",")
+                rows.append({"date": parts[0], "open": parts[1], "close": parts[2], "high": parts[3], "low": parts[4], "volume": parts[5], "amount": parts[6]})
+            df = pd.DataFrame(rows)
         _sleep()
     except Exception as e:
-        _http_disable()
         logger.warning(f"指数拉取失败 {code}: {e}")
         return pd.DataFrame()
 
@@ -146,12 +178,9 @@ def get_sector_flow() -> pd.DataFrame:
         return cached
 
     try:
-        _http_enable()
-        df = ak.stock_sector_fund_flow_rank(indicator="今日", sector_type="行业资金流")
-        _http_disable()
+        df = _fetch_sector_flow(indicator="今日", sector_type="行业资金流")
         _sleep()
     except Exception as e:
-        _http_disable()
         logger.warning(f"板块资金流拉取失败: {e}")
         return pd.DataFrame()
 
