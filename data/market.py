@@ -162,25 +162,26 @@ def get_sector_flow() -> pd.DataFrame:
 
 
 def get_market_breadth() -> dict:
-    """计算市场宽度：涨跌家数比。"""
-    try:
-        _http_enable()
-        df = ak.stock_zh_a_spot_em()
-        _http_disable()
-        _sleep()
-    except Exception as e:
-        _http_disable()
-        logger.warning(f"市场宽度拉取失败: {e}")
+    """计算市场宽度：涨跌家数比。
+
+    使用成交额 Top 300 活跃股作为市场代表样本，
+    避免全市场 5000+ 股票的慢速分页查询（~70s → ~1s）。
+    这 300 只覆盖了市场绝大部分流动性。
+    """
+    from .fundamental import get_active_top_n
+
+    df = get_active_top_n(n=300, sort_by="amount")
+    if df.empty:
         return {}
 
-    if df is None or df.empty:
-        return {}
-
-    pct_col = "涨跌幅" if "涨跌幅" in df.columns else None
-    if pct_col is None:
+    pct_col = "pct_chg"
+    if pct_col not in df.columns:
         return {}
 
     pct = pd.to_numeric(df[pct_col], errors="coerce").dropna()
+    if len(pct) == 0:
+        return {}
+
     return {
         "up": int((pct > 0).sum()),
         "down": int((pct < 0).sum()),
@@ -189,4 +190,3 @@ def get_market_breadth() -> dict:
         "up_ratio": round(float((pct > 0).mean()), 3),
         "avg_pct": round(float(pct.mean()), 2),
     }
-    return df if df is not None and not df.empty else pd.DataFrame()
