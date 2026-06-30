@@ -11,6 +11,15 @@ from loguru import logger
 
 from config import get_settings
 from .cache import DataCache
+
+_EM_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36",
+    "Referer": "https://quote.eastmoney.com/",
+    "Accept": "text/html,application/json,*/*",
+    "Accept-Language": "zh-CN,zh;q=0.9",
+    "Connection": "keep-alive",
+}
+
 # _http imports removed — using direct HTTP
 
 _settings = get_settings()
