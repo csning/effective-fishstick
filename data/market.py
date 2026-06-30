@@ -303,6 +303,60 @@ def get_index_names() -> dict[str, str]:
 # 板块资金流 & 市场宽度 — 东方财富 push2（已验证可用）
 # ═══════════════════════════════════════════════════════════════════
 
+# ═══════════════════════════════════════════════════════════════════
+# 实时报价 — 新浪财经（单次批量查询，零认证）
+# ═══════════════════════════════════════════════════════════════════
+
+_HQ_URL = "https://hq.sinajs.cn/list="
+_HQ_HEADERS = {
+    "User-Agent": "Mozilla/5.0 Chrome/131",
+    "Referer": "https://finance.sina.com.cn/",
+}
+
+def get_realtime_quotes(codes: list[str]) -> dict[str, dict]:
+    """批量获取股票实时报价。
+    新浪实时报价 API, 单次 HTTP GET 查询多只股票。
+    返回: {code: {name, price, open, high, low, preclose, volume, amount, pct_chg}}"""
+    if not codes:
+        return {}
+    sina_codes = ",".join(_to_sina_code(c) for c in codes)
+    try:
+        resp = requests.get(_HQ_URL + sina_codes, headers=_HQ_HEADERS, timeout=10)
+        resp.encoding = "gb2312"
+        result = {}
+        for line in resp.text.strip().split(chr(10)):
+            if not line.strip() or "=" not in line:
+                continue
+            parts = line.split('="')
+            if len(parts) != 2:
+                continue
+            raw_code = parts[0].replace("var hq_str_", "").strip()
+            code = raw_code.replace("sh", "").replace("sz", "")
+            values = parts[1].rstrip('";').split(",")
+            if len(values) < 32:
+                continue
+            result[code] = {
+                "name": values[0],
+                "open": float(values[1]) if values[1] else 0,
+                "preclose": float(values[2]) if values[2] else 0,
+                "price": float(values[3]) if values[3] else 0,
+                "high": float(values[4]) if values[4] else 0,
+                "low": float(values[5]) if values[5] else 0,
+                "volume": float(values[8]) if values[8] else 0,
+                "amount": float(values[9]) if values[9] else 0,
+                "date": values[30] if len(values) > 30 else "",
+                "time": values[31] if len(values) > 31 else "",
+            }
+            preclose = result[code]["preclose"]
+            result[code]["pct_chg"] = round(
+                (result[code]["price"] - preclose) / preclose * 100, 2
+            ) if preclose > 0 else 0
+        return result
+    except Exception:
+        return {}
+
+
+
 _EM_HEADERS = {
     "User-Agent": "Mozilla/5.0 Chrome/131",
     "Referer": "https://quote.eastmoney.com/",

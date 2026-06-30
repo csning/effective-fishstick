@@ -13,7 +13,7 @@ from loguru import logger
 from .base import BaseAgent, AgentContext, AgentResult
 from .llm_client import get_llm
 from data.market import get_daily_kline, get_index_daily
-from data.fundamental import get_active_top_n
+from data.market import get_realtime_quotes
 
 
 SECTOR_PREFIX = {
@@ -158,17 +158,13 @@ class PositionAdvisor(BaseAgent):
         )
 
     async def _fetch_prices(self, codes: list[str]) -> dict[str, float]:
+        """批量获取实时价格 — 新浪报价主, K线回退。"""
         price_map: dict[str, float] = {}
         try:
-            df = get_active_top_n(n=200, sort_by="amount")
-            if df.empty:
-                return price_map
-
-            for _, row in df.iterrows():
-                code = str(row.get("code", ""))
-                price = row.get("price")
-                if code in codes and price is not None:
-                    price_map[code] = float(price) if float(price) > 0 else 0
+            quotes = get_realtime_quotes(codes)
+            for code, q in quotes.items():
+                if q.get("price", 0) > 0:
+                    price_map[code] = q["price"]
         except Exception as e:
             logger.warning(f"批量获取价格失败: {e}")
 
