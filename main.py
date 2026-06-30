@@ -104,6 +104,32 @@ async def main():
         print(f"  持股周期: {profile.holding_period}")
         print(f"  PE 上限: {profile.pe_max}")
 
+    elif cmd == "anomaly":
+        codes = sys.argv[2:] if len(sys.argv) > 2 else []
+        from agents.base import AgentContext
+        from agents.anomaly import AnomalyMonitor
+        monitor = AnomalyMonitor(use_llm=False)
+        ctx = AgentContext(risk_level=settings.risk.default_level)
+        if codes:
+            result = await monitor.run(ctx, symbols=codes)
+        else:
+            result = await monitor.run(ctx)
+        print(result.summary)
+
+    elif cmd == "backtest":
+        codes = sys.argv[2:] if len(sys.argv) > 2 else []
+        if not codes:
+            print("用法: python main.py backtest CODE1 [CODE2 ...]")
+            print("示例: python main.py backtest 600519 000858 300750")
+            return
+        from backtest.engine import BacktestEngine
+        engine = BacktestEngine(
+            start="2025-01-01", end="2026-06-30",
+            symbols=codes, top_n=min(5, len(codes)),
+        )
+        result = engine.run()
+        print(engine.format_result(result))
+
     elif cmd == "serve":
         from web.server import Server
         port = int(sys.argv[2]) if len(sys.argv) > 2 else 8000

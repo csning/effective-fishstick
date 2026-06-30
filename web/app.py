@@ -204,6 +204,7 @@ async def _handle_message(event: dict):
         "position": _handle_position,
         "review": _handle_review,
         "risk": _handle_risk,
+        "anomaly": _handle_anomaly,
         "help": _handle_help,
         "unknown": _handle_unknown,
     }
@@ -367,6 +368,26 @@ async def _handle_unknown(cmd: ParsedCommand, open_id: str, message_id: str):
         message_id,
         f"未识别指令「{cmd.raw}」。\n发送「帮助」查看可用指令。"
     )
+
+
+async def _handle_anomaly(cmd: ParsedCommand, open_id: str, message_id: str):
+    """异动监控指令处理。"""
+    try:
+        from agents.base import AgentContext
+        from agents.anomaly import AnomalyMonitor
+        from config import get_settings
+
+        settings = get_settings()
+        monitor = AnomalyMonitor(use_llm=True)
+        ctx = AgentContext(risk_level=settings.risk.default_level)
+        result = await monitor.run(ctx)
+        if result.success:
+            await get_feishu().reply_text(message_id, result.summary[:3000])
+        else:
+            await get_feishu().reply_text(message_id, f"异动监控失败: {result.error}")
+    except Exception as e:
+        logger.error(f"[飞书] 异动监控异常: {e}")
+        await get_feishu().reply_text(message_id, f"异动监控异常: {e}")
 
 
 async def _handle_card_action(event: dict):

@@ -41,6 +41,8 @@ _register(r"^(复盘|review)$", "review")
 # 风险: 风险 / 风险 3 / risk
 _register(r"^(风险|risk)(?:\s+([1-5]))?\s*$", "risk",
           lambda m: {"level": int(m.group(2)) if m.group(2) else None})
+_register(r"^(异动|anomaly|monitor)\s*$", "anomaly")
+
 
 # 帮助: 帮助 / help
 _register(r"^(帮助|help|\?)$", "help")
